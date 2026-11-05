@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dealer-evaluation
+  labels:
+    app: dealer-evaluation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dealer-evaluation
+  template:
+    metadata:
+      labels:
+        app: dealer-evaluation
+    spec:
+      containers:
+        - name: dealer-evaluation
+          image: dealer-evaluation:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 150m
+              memory: 96Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dealer-evaluation
+  labels:
+    app: dealer-evaluation
+spec:
+  selector:
+    app: dealer-evaluation
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
