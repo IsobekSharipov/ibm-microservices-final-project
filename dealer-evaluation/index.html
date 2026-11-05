@@ -3,90 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dealer Evaluation</title>
+  <title>Dealer Evaluation — All Dealers</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 850px; margin: 3rem auto; padding: 0 1.5rem; line-height: 1.5; }
-    button, select { padding: .6rem 1rem; cursor: pointer; font: inherit; }\n    label { display: block; margin: 1.5rem 0 .4rem; font-weight: 600; }
-    pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; border-radius: .4rem; }
-    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    select, button { padding: .65rem; font: inherit; margin-right: .7rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 .4rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { text-align: left; border: 1px solid #ddd; padding: .8rem; }
+    th { background: #f1f4f8; }
+    #status { margin-top: 1rem; }
   </style>
 </head>
 <body>
   <main>
     <h1>Dealer Evaluation</h1>
-    <p>View product details and dealer prices from their microservices.</p>
-    <label for="product-select">Select a product</label>\n    <select id="product-select" aria-label="Products" disabled>\n      <option value="">Loading products...</option>\n    </select>\n    <p id="product-status" role="status">Loading products from Product Details service...</p>\n    <div class="row">
-      <button id="load-products">Load products</button>
-      <button id="load-pricing">Load dealer pricing</button>
-    </div>
-    <h2>API response</h2>
-    <pre id="result" aria-live="polite">Choose an action above.</pre>
+    <p>Compare prices offered by different dealers for each product.</p>
+    <label for="product-select">Select a product</label>
+    <select id="product-select" disabled>
+      <option value="">Loading products...</option>
+    </select>
+    <label for="dealer-select">Select a dealer</label>
+    <select id="dealer-select">
+      <option value="all">All Dealers</option>
+      <option value="101">Central Dealer</option>
+      <option value="102">City Electronics</option>
+      <option value="103">Tech Market</option>
+    </select>
+    <button id="show-prices">Show Prices</button>
+    <p id="status" role="status">Loading products...</p>
+    <section aria-label="Dealer prices">
+      <h2>Dealer Pricing Results</h2>
+      <table>
+        <thead><tr><th>Product</th><th>Dealer</th><th>Price</th></tr></thead>
+        <tbody id="price-results"><tr><td colspan="3">Choose a product to view prices.</td></tr></tbody>
+      </table>
+    </section>
   </main>
   <script>
-    // Question 4: API endpoint placeholders updated to the Kubernetes services.
-    // Frontend uses same-origin URLs; the Nginx proxy routes these to
-    // http://product-details:5000 and http://dealer-pricing:3000.
+    // API URLs updated to use same-origin Nginx proxies for Kubernetes services.
     const PRODUCT_DETAILS_API_URL = "/api/products";
     const DEALER_PRICING_API_URL = "/api/dealer-pricing";
+    const productSelect = document.getElementById("product-select");
+    const dealerSelect = document.getElementById("dealer-select");
+    const status = document.getElementById("status");
+    const results = document.getElementById("price-results");
 
     async function preloadProducts() {
-      const dropdown = document.getElementById("product-select");
-      const status = document.getElementById("product-status");
       try {
         const response = await fetch(PRODUCT_DETAILS_API_URL);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const products = await response.json();
-        if (!Array.isArray(products)) throw new Error("Invalid product list");
-        dropdown.replaceChildren();
-        const prompt = document.createElement("option");
-        prompt.value = "";
-        prompt.textContent = "Choose a product";
-        dropdown.appendChild(prompt);
+        if (!Array.isArray(products)) throw new Error("Invalid product response");
+        productSelect.replaceChildren();
         for (const product of products) {
           const option = document.createElement("option");
           option.value = String(product.id);
           option.textContent = product.name;
-          dropdown.appendChild(option);
+          productSelect.appendChild(option);
         }
-        dropdown.disabled = products.length === 0;
-        status.textContent = `${products.length} products loaded successfully.`;
+        productSelect.disabled = products.length === 0;
+        status.textContent = `${products.length} products loaded.`;
       } catch (error) {
-        dropdown.replaceChildren();
-        const option = document.createElement("option");
-        option.textContent = "Products unavailable";
-        dropdown.appendChild(option);
-        dropdown.disabled = true;
-        status.textContent = `Could not load products: ${error.message}`;
+        status.textContent = `Failed to load products: ${error.message}`;
       }
     }
 
-    async function showData(endpoint) {
-      const output = document.getElementById("result");
-      output.textContent = "Loading...";
+    async function showPrices() {
+      const productId = productSelect.value;
+      if (!productId) { status.textContent = "Select a product first."; return; }
+      status.textContent = "Loading dealer prices...";
       try {
-        const response = await fetch(endpoint);
+        const response = await fetch(`${DEALER_PRICING_API_URL}/${encodeURIComponent(productId)}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        output.textContent = JSON.stringify(data, null, 2);
+        const prices = await response.json();
+        if (!Array.isArray(prices)) throw new Error("Invalid dealer pricing response");
+        const selectedDealer = dealerSelect.value;
+        const filtered = selectedDealer === "all"
+          ? prices
+          : prices.filter((item) => String(item.dealer_id) === selectedDealer);
+        results.replaceChildren();
+        for (const item of filtered) {
+          const row = document.createElement("tr");
+          const productCell = document.createElement("td");
+          const dealerCell = document.createElement("td");
+          const priceCell = document.createElement("td");
+          productCell.textContent = productSelect.selectedOptions[0].textContent;
+          dealerCell.textContent = item.dealer_name;
+          priceCell.textContent = new Intl.NumberFormat("en-US", {
+            style: "currency", currency: item.currency
+          }).format(item.price);
+          row.append(productCell, dealerCell, priceCell);
+          results.appendChild(row);
+        }
+        if (!filtered.length) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 3;
+          cell.textContent = "No prices found.";
+          row.appendChild(cell);
+          results.appendChild(row);
+        }
+        status.textContent = `Showing ${filtered.length} dealer price(s).`;
       } catch (error) {
-        output.textContent = `Request failed: ${error.message}`;
+        results.replaceChildren();
+        status.textContent = `Failed to load prices: ${error.message}`;
       }
     }
 
-    document.getElementById("product-select").addEventListener("change", (event) => {
-      if (event.target.value) {
-        showData(`${PRODUCT_DETAILS_API_URL}/${encodeURIComponent(event.target.value)}`);
-      }
-    });
-
+    document.getElementById("show-prices").addEventListener("click", showPrices);
+    productSelect.addEventListener("change", showPrices);
+    dealerSelect.addEventListener("change", showPrices);
     preloadProducts();
-
-    document.getElementById("load-products").addEventListener("click", () => {
-      showData(PRODUCT_DETAILS_API_URL);
-    });
-    document.getElementById("load-pricing").addEventListener("click", () => {
-      showData(DEALER_PRICING_API_URL);
-    });
   </script>
 </body>
 </html>
