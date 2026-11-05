@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dealer Evaluation</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 850px; margin: 3rem auto; padding: 0 1.5rem; line-height: 1.5; }
+    button { padding: .6rem 1rem; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; border-radius: .4rem; }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dealer Evaluation</h1>
+    <p>View product details and dealer prices from their microservices.</p>
+    <div class="row">
+      <button id="load-products">Load products</button>
+      <button id="load-pricing">Load dealer pricing</button>
+    </div>
+    <h2>API response</h2>
+    <pre id="result" aria-live="polite">Choose an action above.</pre>
+  </main>
+  <script>
+    // Question 4: API endpoint placeholders updated to the Kubernetes services.
+    // Frontend uses same-origin URLs; the Nginx proxy routes these to
+    // http://product-details:5000 and http://dealer-pricing:3000.
+    const PRODUCT_DETAILS_API_URL = "/api/products";
+    const DEALER_PRICING_API_URL = "/api/dealer-pricing";
+
+    async function showData(endpoint) {
+      const output = document.getElementById("result");
+      output.textContent = "Loading...";
+      try {
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        output.textContent = `Request failed: ${error.message}`;
+      }
+    }
+
+    document.getElementById("load-products").addEventListener("click", () => {
+      showData(PRODUCT_DETAILS_API_URL);
+    });
+    document.getElementById("load-pricing").addEventListener("click", () => {
+      showData(DEALER_PRICING_API_URL);
+    });
+  </script>
+</body>
+</html>
