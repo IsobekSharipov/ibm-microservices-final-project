@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dealer-pricing
+  labels:
+    app: dealer-pricing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dealer-pricing
+  template:
+    metadata:
+      labels:
+        app: dealer-pricing
+    spec:
+      containers:
+        - name: dealer-pricing
+          image: dealer-pricing:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dealer-pricing
+  labels:
+    app: dealer-pricing
+spec:
+  selector:
+    app: dealer-pricing
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
