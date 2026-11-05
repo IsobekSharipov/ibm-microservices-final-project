@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-details
+  labels:
+    app: product-details
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-details
+  template:
+    metadata:
+      labels:
+        app: product-details
+    spec:
+      containers:
+        - name: product-details
+          image: product-details:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-details
+spec:
+  selector:
+    app: product-details
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP
